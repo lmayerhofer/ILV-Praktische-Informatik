@@ -1,6 +1,7 @@
 /*
  * Aufgabe 1
  * Lukas Mayerhofer
+ * 20.10.12
  */
 
 #include "merge_lists.cpp"

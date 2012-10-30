@@ -1,0 +1,21 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1187\cocoasubrtf340
+{\fonttbl\f0\fnil\fcharset0 HelveticaNeue;}
+{\colortbl;\red255\green255\blue255;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww10800\viewh8400\viewkind0
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5243\tx5669\tx6236\tx6803\pardirnatural
+
+\f0\b\fs36 \cf0 Wie funktioniert Heap Sort?
+\b0\fs24 \
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\sl288\slmult1\pardirnatural
+
+\fs28 \cf0 \
+Bei dem Sortierverfahren wird immer das letzte Element im Baum an die erste Stelle (bei Max-Heap also an Stelle des gr\'f6\'dften Elements) gesetzt. Das gr\'f6\'dfte Element wird in das sortierte Array geschrieben und der Heap wird um 1 verkleinert. Das neue erste Element des Heaps (zuvor letztes Element) kann danach die Heap-Eigenschaft verletzen. Darum wird der Heap als n\'e4chstes wieder so umgebaut, dass die Heap-Eigenschaft gilt.\
+Das ganze wird dann f\'fcr jedes Element wiederholt, bis man am Ende ein sortiertes Array (sortierten Heap) hat.\
+\
+\
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5243\tx5669\tx6236\tx6803\pardirnatural
+
+\b\fs36 \cf0 Warum hat Heap Sort im worst case wine Komplexit\'e4t von O(n * log n)?
+\b0\fs28 \
+\
+Wie schon erw\'e4hnt wird beim Sortieren nach jedem Tauschvorgang der Heap um 1 verkleinert. pop() (wie auch push()) hat eine Komplexit\'e4t von O(log n). Um zu sortieren muss au\'dferdem jeder der n Knoten betrachtet werden, woraus sich die Komplexit\'e4t von O(n * log n) ergibt.}
