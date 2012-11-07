@@ -7,6 +7,9 @@
 class AvlTree {
 	public:
     	AvlTree() : root(0) { }
+    	virtual ~AvlTree() {
+    		deleteNode(root);
+    	}
 
 		void insert(double d) {
 			if (!root) root = new AvlNode(d);
@@ -54,6 +57,14 @@ class AvlTree {
 					if (d > node->right->data) rotate_left(node);
 					else rotate_right_left(node);
 				}
+			}
+		}
+
+		void deleteNode(AvlNode *node) {
+			if (node) {
+				deleteNode(node->left);
+				deleteNode(node->right);
+				delete node;
 			}
 		}
 

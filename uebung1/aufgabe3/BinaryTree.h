@@ -7,6 +7,9 @@
 class BinaryTree {
 	public:
     	BinaryTree() : root(0) { }
+    	virtual ~BinaryTree() {
+    		deleteNode(root);
+    	}
 
 		void insert(double d) {
 			if (!root) root = new Node(d);
@@ -42,6 +45,14 @@ class BinaryTree {
 				insert(node->left, d);
 			else if (d > node->data)
 				insert(node->right, d);
+		}
+
+		void deleteNode(Node *node) {
+			if (node) {
+				deleteNode(node->left);
+				deleteNode(node->right);
+				delete node;
+			}
 		}
 
 		Node *root;

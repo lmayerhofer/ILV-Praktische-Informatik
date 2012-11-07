@@ -9,4 +9,8 @@
 \pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\sl288\slmult1\pardirnatural
 
 \fs28 \cf0 \
-Das Problem ist, dass beim insert() ein paarmal height() aufgerufen wird. Die Funktion height() ist dabei rekursiv. Das hei\'dft bei jedem insert() wird die height f\'fcr einen bestimmten Knoten jedesmal neu berechnet. W\'fcrde man die height in jedem Knoten abspeichern k\'f6nnte man die Komplexit\'e4t um einiges verringern, da danach nur noch die height vom jeweiligen Knoten abgerufen werden muss, was einer Komplexit\'e4t von O(1) entspricht.}
+Ein Avl-Baum hat beim Einf\'fcgen im schlechtesten Fall eine Komplexit\'e4t von O(log n). Das kommt dadurch zustande, dass der einzuf\'fcgende Knoten (im schlechtesten Fall) mit allen Knoten des Baumes verglichen werden muss (rekursiv), um die Einf\'fcgeposition zu bestimmen.\
+\
+Das Problem im AvlBaum aus der Vorlesung ist, dass bei jedem insert() ein paar Mal die Funktion height() aufgerufen wird um die aktuelle H\'f6he des Baumes zu erhalten. Da height() ebenfalls rekursiv arbeitet wird hier wieder jedes Mal der ganze Baum durchgegangen. Das hei\'dft es tritt wieder eine Komplexit\'e4t von O(log n) auf.\
+\
+Um die Komplexit\'e4t dieser H\'f6henberechnung zu verbessern, k\'f6nnte man die berechnete H\'f6he nach dem rekursiven Durchlauf in jedem Knoten abspeichern. Das hei\'dft die H\'f6he wird beim insert() nur einmal berechnet, abgespeichert und kann anschlie\'dfend bei den rekursiven Aufrufen von insert() ausgelesen werden. Die Komplexit\'e4t sinkt auf O(1) um die jeweilige H\'f6he zu bekommen.}
