@@ -3,7 +3,7 @@
 
 template<typename Tkey, typename Tdata> class Skiplist {
 	public:
-		Skiplist(int levelMax) : levelMax(levelMax), head(...) { }
+		Skiplist(int levelMax) { }
 		~Skiplist() { };
 
 		int generateRandomLevel() {
@@ -17,8 +17,9 @@ template<typename Tkey, typename Tdata> class Skiplist {
 			Get random level => Level of Node = generateRandomLevel()
 			If level > levelMax => update levelMax
 			New node has number of level pointers
-			Search given key in List => search(key)
-			Splice and insert node (next pointer to next node) => return true
+			Search the given key in List => search(key)
+			Splice and insert new node (set next pointers from found node and new node)
+			Return true
 			*/
 		}
 
@@ -35,7 +36,8 @@ template<typename Tkey, typename Tdata> class Skiplist {
 
 	private:
 		int levelMax;
-		Node* head;			
+		Node* head;	
+		Node* tail;		
 
 		struct Node {
 			Tkey key
