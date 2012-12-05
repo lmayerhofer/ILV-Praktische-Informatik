@@ -20,11 +20,16 @@ struct IRNode {
             {
                 unsigned result = 1;
                 unsigned base = left->eval();
-                unsigned exponent = right->eval();
-                for(unsigned i = 0; i < exponent; i++) {
-                    result *= base;
+                if(right->eval() > 0) {
+                    unsigned exponent = right->eval();
+                    for(unsigned i = 0; i < exponent; i++) {
+                        result *= base;
+                    }
+                    return result;
+                } else {
+                    fprintf(stderr, "\nERROR: Exponent must be a positive number (greater than 0).\n");
+                    return 0;   // if exponent smaller or equal to 0
                 }
-                return result;
             }
             case MAX:
             {
@@ -36,76 +41,59 @@ struct IRNode {
         }
     }
 
-    void gen_x86_64() const {
+    void generate_x86() const {
         switch (type) {
             case NUMBER:
                 printf("\tmovl\t$%d, %%eax\n", value);
                 break;
             case PLUS:
-                left->gen_x86_64();
-                printf("\tpushq\t%%rax\n");
-                right->gen_x86_64();
-                printf("\tpopq\t%%rbx\n");
-                printf("\taddl\t%%ebx, %%eax\n");
-                break;
-            case MINUS:
-                left->gen_x86_64();
-                printf("\tpushq\t%%rax\n");
-                right->gen_x86_64();
-                printf("\tpopq\t%%rbx\n");
-                printf("\tsubl\t%%eax, %%ebx\n");
-                printf("\tmovl\t%%ebx, %%eax\n");
-                break;
-            case MULT:
-                left->gen_x86_64();
-                printf("\tpushq\t%%rax\n");
-                right->gen_x86_64();
-                printf("\tpopq\t%%rbx\n");
-                printf("\tmull\t%%ebx\n");
-                break;
-            default:
-                throw "gen x86_64 failed";
-        }
-    }
-
-    void gen_x86() const {
-        switch (type) {
-            case NUMBER:
-                printf("\tmovl\t$%d, %%eax\n", value);
-                break;
-            case PLUS:
-                left->gen_x86();
+                left->generate_x86();
                 printf("\tpushl\t%%eax\n");
-                right->gen_x86();
+                right->generate_x86();
                 printf("\tpopl\t%%ebx\n");
                 printf("\taddl\t%%ebx, %%eax\n");
                 break;
             case MINUS:
-                left->gen_x86();
+                left->generate_x86();
                 printf("\tpushl\t%%eax\n");
-                right->gen_x86();
+                right->generate_x86();
                 printf("\tpopl\t%%ebx\n");
                 printf("\tsubl\t%%eax, %%ebx\n");
                 printf("\tmovl\t%%ebx, %%eax\n");
                 break;
             case MULT:
-                left->gen_x86();
+                left->generate_x86();
                 printf("\tpushl\t%%eax\n");
-                right->gen_x86();
+                right->generate_x86();
                 printf("\tpopl\t%%ebx\n");
                 printf("\tmull\t%%ebx\n");
                 break;
             case POW:
                 // move value/operand to eax
-                left->gen_x86();
-                // move value of eax (left value/operand) to ebx (base register)
-                printf("\tmovl\t%%eax, %%ebx\n");
+                right->generate_x86();
                 
-                // move value/operand to eax
-                right->gen_x86();
-                // move value of eax (right value/operand) to ecx (counter register)
+                // move 0 to ebx (base register)
+                // printf("\tmovl\t$0, %%ebx\n");
+
+                // compare value from eax with 0
+                printf("\tcmp\t$0, %%eax\n");
+
+                // if right (eax) not greater => return
+                printf("\tja greater\n");
+
+                printf("\tmovl\t$0, %%eax\n");                
+                printf("\tretl\n");
+
+                // else: move value from eax to ecx
+                printf("\tgreater:");
+                // move value from eax (right value/operand) to ecx (counter register)
                 printf("\tmovl\t%%eax, %%ecx\n");
                 
+                // move value/operand to eax
+                left->generate_x86();
+                // move value from eax (left value/operand) to ebx (base register)
+                printf("\tmovl\t%%eax, %%ebx\n");
+
                 // move 1 to eax (accumulator register)
                 printf("\tmovl\t$1, %%eax\n");
 
@@ -118,12 +106,12 @@ struct IRNode {
                 break;
             case MAX:
                 // move value/operand to eax
-                left->gen_x86();
-                
-                // move value/operand to eax
-                right->gen_x86();
-                // move value of eax (left value/operand) to edx
+                left->generate_x86();
                 printf("\tmovl\t%%eax, %%edx\n");
+
+                // move value/operand to eax
+                right->generate_x86();
+                // move value of eax (left value/operand) to edx
                 
                 // compare value from eax with value from edx
                 printf("\tcmp\t%%eax, %%edx\n");
@@ -141,20 +129,8 @@ struct IRNode {
         }
     }
 
-    void gen_expr_x86_64() const {
-        fprintf(stderr, "generating x86-64 code\n");
-
-        printf("\t.text\n");
-        printf("\t.globl calc_expr\n");
-        printf("calc_expr:\n");
-
-        gen_x86_64();
-
-        printf("\tretq\n");
-    }
-
-    void gen_expr_x86() const {
-        fprintf(stderr, "generating x86 code\n");
+    void generate_expr_x86() const {
+        fprintf(stderr, "generating x86 code...\n\n");
 
         printf("\t.text\n");
         printf("\t.globl calc_expr\n");
@@ -162,7 +138,7 @@ struct IRNode {
         // most first variable from stack to edi
         printf("\tmovl\t4(%%esp), %%edi\n");
 
-        gen_x86();
+        generate_x86();
 
         printf("\tretl\n");
     }
@@ -180,33 +156,28 @@ int main(int argc, const char* argv[]) {
 
     switch(operatorChoice) {
         case 1:
-            ir = new IRNode(IRNode::MINUS,
-            new IRNode(IRNode::MULT, new IRNode(5), new IRNode(3)),
-            new IRNode(4));
+            fprintf(stderr, "\n6 ^ 3:\n");
+            ir = new IRNode(IRNode::POW, new IRNode(6), new IRNode(3));
             break;
         case 2:
+            fprintf(stderr, "\n6 ^ 0:\n");
+            ir = new IRNode(IRNode::POW, new IRNode(6), new IRNode(0));
             break;
         case 3:
-            break;
-        case 4:
-            ir = new IRNode(IRNode::POW, new IRNode(3), new IRNode(4));
-            break;
-        case 5:
-            ir = new IRNode(IRNode::MAX, new IRNode(2), new IRNode(10));
+            fprintf(stderr, "\nMaximum von 21 und 14\n");
+            ir = new IRNode(IRNode::MAX, new IRNode(21), new IRNode(14));
             break;
         default:
             throw "main switch failed";
     }
 
-    fprintf(stderr, "eval(interpreted) = %d\n", ir->eval());
+    fprintf(stderr, "interpreted: %d\n", ir->eval());
 
     if (ir) {
-        if (sizeof(void *) == 8)
-            ir->gen_expr_x86_64();
-        else if (sizeof(void *) == 4)
-            ir->gen_expr_x86();
+        if (sizeof(void *) == 4)
+            ir->generate_expr_x86();
         else
-            throw "unknown architecture";
+            throw "architecture not supported";
     }
 
     return EXIT_SUCCESS;

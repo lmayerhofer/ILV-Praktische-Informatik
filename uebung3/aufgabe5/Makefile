@@ -1,22 +1,17 @@
-all: generate
+all:
+	echo "\nBenutzung:\n1. make pow1|pow2|max\n2. make test\n"
 
 generate: generate.cpp
 	$(CXX) -Wall -o $@ generate.cpp
 
-plus: generate
+pow1: generate
 	./generate 1 > calc_expr.s
 
-minus: generate
+pow2: generate
 	./generate 2 > calc_expr.s
 
-mult: generate
-	./generate 3 > calc_expr.s
-
-pow: generate
-	./generate 4 > calc_expr.s
-
 max: generate
-	./generate 5 > calc_expr.s
+	./generate 3 > calc_expr.s
 
 test:
 	as -c -o calc_expr.o calc_expr.s

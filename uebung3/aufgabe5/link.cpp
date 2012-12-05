@@ -4,8 +4,11 @@
 extern "C" unsigned calc_expr();
 
 int main() {
-  printf("architecture %s\n", sizeof(void *) == 8 ? "64bit" : "32bit");
-  printf("expr(compiled) = %d\n", calc_expr());
+	if(sizeof(void *) == 4) {
+		printf("\ncompiled: %d\n\n", calc_expr());
+	} else {
+		printf("\narchitecture not supported\n\n");
+	}
 
-  return EXIT_SUCCESS;
+	return EXIT_SUCCESS;
 }
