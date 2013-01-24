@@ -1,6 +1,0 @@
-ttttttttt
-Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor
-These are the
-lines from
-open_file.txt
-   I test   

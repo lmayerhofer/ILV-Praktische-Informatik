@@ -4,8 +4,12 @@
 #include <iostream>
 #include <math.h>
 #include <string>
+#include <sstream>
 #include <vector>
 #include <map>
+#include <iomanip>
+
+#include "ring_buffer.h"
 
 using namespace std;
 
@@ -17,118 +21,222 @@ public:
 	//
 	//
 	//
-	CacheSimulator(unsigned cs, unsigned cls, Organization org, unsigned ss=1, unsigned al=32) : cache_size(cs), cache_line_size(cls), organization(org), set_size(ss), address_length(al) {
+	CacheSimulator(unsigned cs, unsigned cls, Organization org, unsigned ss=1, unsigned al=64) : cache_size(cs), cache_line_size(cls), organization(org), set_size(ss), address_length(al) {
 		
-		unsigned no_cache_lines = cache_size / cache_line_size;
+		hits = 0;
+		misses = 0;
+
+		// Anzahl der Cachelines berechnen
+		no_cache_lines = cache_size / cache_line_size / set_size;
 		
-		lo_offset = log(address_length) / log(2);
+		// Länge des Offsets
+		lo_offset = log(cache_line_size) / log(2);
 		
-		switch(organization){
-			case DIRECT_MAPPED: 
-				lo_index = log(no_cache_lines) / log(2);
-				break;
-			case FULLY_ASSOCIATIVE:
-				lo_index = 0;
-				break;
-			case SET_ASSOCIATIVE:
-				lo_index = (log(no_cache_lines / set_size) / log(2));
-				
-				break;
+		// Länge des Index; wenn "fully assoc", dann kein Index
+		if (organization==FULLY_ASSOCIATIVE) {
+			lo_index = 0;
+		}
+		else {
+			lo_index = log(no_cache_lines) / log(2);
 		}
 		
+		// Länge des Tags berechnen
 		lo_tag = address_length - lo_offset - lo_index;
 		
-		cout << "Cache: " << organization << "\n";
-		cout << "lo_offset: " << lo_offset << "\n";
-		cout << "lo_index: " << lo_index << "\n";
-		cout << "lo_tag: " << lo_tag << "\n\n";
+		// Offset-Maske erstellen
+		lo_offset_mask = 0x00;
+		for (unsigned i=0; i<lo_offset; i++) {
+			lo_offset_mask <<= 1;
+			lo_offset_mask = lo_offset_mask | 0x01;
+		}
+		
+		// Index-Maske erstellen
+		lo_index_mask = 0x00;
+		for (unsigned i=0; i<lo_index; i++) {
+			lo_index_mask <<= 1;
+			lo_index_mask = lo_index_mask | 0x01;
+		}
+		
+		// Struktur für Index/Tag initialisieren (=>Array aus RingBuffern)
+		cache = new RingBuffer[no_cache_lines];
+		for(unsigned i=0; i<no_cache_lines; i++) {
+			cache[i].set_size(set_size);
+		}
+		
+		// Eine leere Maske für die einzelnen Cachelines generieren
+		string cache_line_mask = "";
+		for (unsigned i=0; i<cache_line_size; i++) {
+			cache_line_mask.append("0");
+		}
+
+		// die einzelnen Cachelines mit der leeren Maske befüllen
+		cache_lines.resize(no_cache_lines * set_size);
+		for (unsigned i=0; i<no_cache_lines*set_size; i++) {
+			cache_lines[i] = cache_line_mask;
+		}
+
+		cout << "Cache: " << organization << endl;
+		cout << "no_cache_lines: " << no_cache_lines << endl;
+		cout << "cache_line_size: " << cache_line_size << endl;
+		cout << "lo_offset: " << lo_offset << endl;
+		cout << "lo_index: " << lo_index << endl;
+		cout << "lo_tag: " << lo_tag << endl;
+		cout << "set_size: " << set_size << endl << endl;
 		
 	}
 	~CacheSimulator(){}
 	
-	void handle_address(string address, string &tag, string &index, string &offset) {
-		string bin_address = hex2bin(address);
+	bool handle_address(string address, unsigned &tag, unsigned &index, unsigned &offset) {
 		
-		tag    = bin_address.substr(0, lo_tag);
-		index  = bin_address.substr(lo_tag-1, lo_index);
-		offset = bin_address.substr(lo_tag+lo_index-1, lo_offset);
+		static unsigned counter = 0;
+
+		counter++;
+
+		// zu kurze Adressen mit 0 auffüllen
+		while(address.length() < (address_length / 4)) {
+			address = "0" + address;
+		}
 		
-		cout << "Tag: " << tag << " - Index: " << index << " - Offset: " << offset << "\n";
+		long unsigned bin_address;
+		
+		istringstream(address) >> hex >> bin_address;
+		
+		offset = bin_address & lo_offset_mask;
+		bin_address >>= lo_offset;
+		
+		index = bin_address & lo_index_mask;
+		bin_address >>= lo_index;
+		
+		tag = bin_address;
+		
+		printf("(%d) %lx - %x - %x\n", counter, bin_address, index, offset);
+
+		return !out_of_bound_error(index);
 	}
 	
 	void new_instruction(string address, unsigned size) {
-		string tag;
-		string index;
-		string offset;
+		unsigned tag;
+		unsigned index;
+		unsigned offset;
 		
-		handle_address(address, tag, index, offset);
+		if (!handle_address(address, tag, index, offset)) return;
 		
-		if(cache[index][tag]==1){
-			hits++;
-		}
-		else {
-			misses++;
-		}
-		
+		check_hit_or_miss(tag, index, offset);
 		// cout << "I " << address << " " << bin_address << "\n";
 	}
 	
 	void new_store(string address, unsigned size) {
-		string tag;
-		string index;
-		string offset;
+		unsigned tag;
+		unsigned index;
+		unsigned offset;
 		
-		handle_address(address, tag, index, offset);
-		
-		cache[index][tag] = 1;
+		if (!handle_address(address, tag, index, offset)) return;
+
+		cache[index].push(tag);
 	}
 	
 	void new_load(string address, unsigned size) {
-		string tag;
-		string index;
-		string offset;
+		unsigned tag;
+		unsigned index;
+		unsigned offset;
 		
-		handle_address(address, tag, index, offset);
+		if (!handle_address(address, tag, index, offset)) return;
 		
-		if(cache[index][tag]==1){
-			hits++;
+		bool hit = false;
+
+		int tag_index = cache[index].find(tag);
+		unsigned cache_line_index = 0;
+
+		if (tag_index >= 0) {
+			cache_line_index = (index * set_size + tag_index) -1;
+
+			cout << "at offset: " << cache_lines[cache_line_index][offset] << endl;
+			if (cache_lines[cache_line_index][offset]=='1') {
+				hits++;
+				hit = true;
+			}
 		}
-		else {
+		if(!hit) {
 			misses++;
+			tag_index = cache[index].push(tag);
+			cache_line_index = (index * set_size + tag_index) - 1;
+
+			if (cache_line_index==0) {
+				cout << "i: " << index << " * ss: " << set_size << " + ti: " << tag_index << " -1" << endl;
+			}
+			
+			/*cout << "cli: " << cache_line_index << endl;
+			cout << "tag_index: " << tag_index << endl;
+			cout << "index: " << index << " / size: " << size << " / offset: " << offset << endl;
+			cout << "gibt: " << (int)(cache_line_size-(size - 1 + offset)) << endl;*/
+
+			if ((int)(cache_line_size-(size - 1 + offset)) < 0) {
+				cout << "end of the line" << endl;
+				while(size > 0) {
+					if (cache_line_index>(no_cache_lines*set_size)) {
+						cout << "Out of bounds: Too much data for my little cache :-(" << endl;
+						throw;
+					}
+					while(size > 0 && offset<cache_line_size) {
+						cout << cache_lines[cache_line_index].size() << " VS " << offset << endl;
+						cache_lines[cache_line_index][offset] = '1';
+						offset++;
+						size--;
+					}
+					offset = 0;
+					cache_line_index++;
+				}
+			} 
+			else {
+				cout << "--------------------------------------------------------------------->" << offset << " / " << cache_line_index << endl;
+				cout << "at offset: " << cache_lines[cache_line_index][offset] << endl;
+				for (unsigned i=0; i<size; i++) {
+					cache_lines[cache_line_index][offset+i] = '1';
+				}
+			}
 		}
 	}
 	
 	void new_modify(string address, unsigned size) {
-		string tag;
-		string index;
-		string offset;
+		unsigned tag;
+		unsigned index;
+		unsigned offset;
 		
-		handle_address(address, tag, index, offset);
+		if (!handle_address(address, tag, index, offset)) return;
 		
-		if(cache[index][tag]==1){
-			hits++;
-		}
-		else {
-			misses++;
-		}
+		check_hit_or_miss(tag, index, offset);
 	}
 	
-	// void print_cache() const {
-	// 	typedef map<string, int> inner_map;
-	// 	typedef map<string, inner_map > outer_map;
-	// 	
-	// 	
-	// 	for(outer_map::iterator i = cache.begin(); i != cache.end(); i++) {
-	// 		cout << i->first << "\n";
-	// 		
-	// 		inner_map &im = i->second;
-	// 		
-	// 		for(inner_map::iterator j = im.begin(); j != im.end(); j++) {
-	// 			cout << "   " << j->first << "\n";
-	// 		}
-	// 	}
-	// }
+	void check_hit_or_miss(unsigned tag, unsigned index, unsigned offset) {
+		
+		// TODO: offset & iterieren bei längeren inserts
+		
+	}
+
+	bool out_of_bound_error(unsigned index) {
+		if (index > no_cache_lines) {
+			cout << "Error: Array out of bound: "<< index << " / " << no_cache_lines << endl;
+			return true;
+		}
+		else return false;
+	}
 	
+	float get_misses_percent() const {
+		if (misses + hits ==0)
+			return 0.0;
+
+		return ((float)misses / ((float)hits + (float)misses)) * 100;
+		//return 0.0;
+	}
+
+	float get_hits_percent() const {
+		if (misses + hits ==0)
+			return 0.0;
+
+		return ((float)hits / (hits + misses)) * 100;
+		//return 0.0;
+	}
+
 	unsigned get_hits() const {
 		return hits;
 	}
@@ -137,11 +245,24 @@ public:
 		return misses;
 	}
 	
+	void print_cache_lines() const {
+		for(unsigned i=0; i < no_cache_lines*set_size; i++) {
+			cout << cache_lines[i] << endl;
+		}
+	}
+
+
 private:
-	map<string, map<string, int> > cache;
+
+	// Struktur für Index/Tag
+	RingBuffer *cache;
 	
+	// Struktur für tatsächliche Cachelines
+	vector<string> cache_lines;
+
 	unsigned cache_size;
 	unsigned cache_line_size;
+	unsigned no_cache_lines;
 	Organization organization;
 	unsigned set_size;
 	unsigned address_length;
@@ -150,36 +271,11 @@ private:
 	unsigned lo_index;
 	unsigned lo_offset;
 	
+	int lo_offset_mask;
+	int lo_index_mask;
+	
 	unsigned hits;
 	unsigned misses;
-	
-	map<string, unsigned> no_used_cache_lines;
-	
-	string hex2bin(string address) {
-		string str = "";
-		for (unsigned i = 0; i < address.length(); ++i) {
-			switch (address [i]) {
-				case '0': str.append ("0000"); break;
-				case '1': str.append ("0001"); break;
-				case '2': str.append ("0010"); break;
-				case '3': str.append ("0011"); break;
-				case '4': str.append ("0100"); break;
-				case '5': str.append ("0101"); break;
-				case '6': str.append ("0110"); break;
-				case '7': str.append ("0111"); break;
-				case '8': str.append ("1000"); break;
-				case '9': str.append ("1001"); break;
-				case 'a': str.append ("1010"); break;
-				case 'b': str.append ("1011"); break;
-				case 'c': str.append ("1100"); break;
-				case 'd': str.append ("1101"); break;
-				case 'e': str.append ("1110"); break;
-				case 'f': str.append ("1111"); break;
-			}
-		}
-		return str;
-	}
-	
 };
 
 #endif

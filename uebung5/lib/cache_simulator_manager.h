@@ -1,6 +1,8 @@
 #ifndef CACHE_SIMULATOR_MANAGER
 #define CACHE_SIMULATOR_MANAGER
 
+#include <stdio.h>
+#include <stdlib.h>
 #include "compact_vector.h"
 #include "print_vector.h"
 #include "split_string.h"
@@ -12,10 +14,17 @@ public:
 	//
 	//
 	CacheSimulatorManager();
-	CacheSimulatorManager(CacheSimulator ic, CacheSimulator dc) : instruction_cache(ic), data_cache(dc) {}
+	CacheSimulatorManager(CacheSimulator ic, CacheSimulator dc) : instruction_cache(ic), data_cache(dc) {
+		reads = 0;
+		stores = 0;
+		loads = 0;
+		modifies = 0;
+	}
 	~CacheSimulatorManager(){}
 	
 	void handle_line(std::string line) {
+		
+		// komische Zeilen überspringen
 		if (line=="x.x" || line.find('#')==0) return;
 		
 		std::string operation;
@@ -35,29 +44,29 @@ public:
 				address = parts[0];
 				size = atoi(parts[1].c_str());
 				
-					if (operation =="I") {
-						instruction_cache.new_instruction(address, size);
-						reads++;
-					}
-					else if (operation == "S") {
-						data_cache.new_store(address, size);
-						stores++;
-					}
-					else if (operation == "L") {
-						data_cache.new_load(address, size);
-						loads++;
-					}
-					else if (operation == "M") {
-						data_cache.new_modify(address, size);
-						modifies++;
-					}
+				if (operation =="I") {
+					instruction_cache.new_instruction(address, size);
+					reads++;
+				}
+				else if (operation == "S") {
+					data_cache.new_store(address, size);
+					stores++;
+				}
+				else if (operation == "L") {
+					data_cache.new_load(address, size);
+					loads++;
+				}
+				else if (operation == "M") {
+					data_cache.new_modify(address, size);
+					modifies++;
+				}
 			}
 			else {
-				throw(line);
+				throw(line.c_str());
 			}
 		}
 		else {
-			throw(line);
+			throw(line.c_str());
 		}
 	}
 	
@@ -68,12 +77,14 @@ public:
 		cout << "modifies: " << modifies << "\n\n";
 		
 		cout << "Instruction cache: \n";
-		cout << "hits: "   << instruction_cache.get_hits() << "\n";
-		cout << "misses: " << instruction_cache.get_misses() << "\n\n";
+		cout << "hits: "   << instruction_cache.get_hits() << "(" << instruction_cache.get_hits_percent() << "%)\n";
+		cout << "misses: " << instruction_cache.get_misses() << "(" << instruction_cache.get_misses_percent() << "%)\n\n";
 		
 		cout << "Data cache: \n";
-		cout << "hits: "   << data_cache.get_hits() << "\n";
-		cout << "misses: " << data_cache.get_misses() << "\n";
+		cout << "hits: "   << data_cache.get_hits() << "(" << data_cache.get_hits_percent() << "%)\n";
+		cout << "misses: " << data_cache.get_misses() << "(" << data_cache.get_misses_percent() << "%)\n";
+
+		data_cache.print_cache_lines();
 	}
 	
 private:

@@ -14,9 +14,9 @@
 
 int main (int argc, char *argv[]) {
 	
-	CacheSimulator instruction_cache = CacheSimulator(4096,   32, CacheSimulator::DIRECT_MAPPED);
-	CacheSimulator data_cache        = CacheSimulator(262144, 32, CacheSimulator::SET_ASSOCIATIVE, 4);
-	CacheSimulatorManager cs_manager = CacheSimulatorManager(instruction_cache, data_cache);
+	CacheSimulator instruction_cache(128, 32, CacheSimulator::DIRECT_MAPPED);
+	CacheSimulator data_cache(128, 32, CacheSimulator::DIRECT_MAPPED);
+	CacheSimulatorManager cs_manager(instruction_cache, data_cache);
 	
 	std::string line;
 	
